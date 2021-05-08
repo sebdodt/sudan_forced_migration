@@ -1,0 +1,640 @@
+---
+title: "Data Cleaning"
+author: "Sebastian Dodt"
+date: "21/03/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Data Cleaning
+
+```{r, message = FALSE}
+library(readxl)
+library(zoo)
+library(sjlabelled)
+library(tidyverse)
+require(jsonlite)
+require(dplyr)
+require(tidyr)
+library(zoo)
+library(ggplot2)
+library(geosphere)
+library(lubridate)
+```
+
+Importing the datasets from the International Organisation of Migration
+```{r, message = FALSE}
+setwd("~/OneDrive/Uni/SOAS University of London/Modules/year 3/Machine Learning/Project/Datasets")
+jan20 <- read_xlsx("dtm-south-sudan-flow-monitoring-jan20.xlsx")
+feb20 <- read_xlsx("dtm-south-sudan-flow-monitoring-feb20.xlsx")
+mar20 <- read_xlsx("dtm-south-sudan-flow-monitoring-mar20.xlsx")
+apr20 <- read_xlsx("dtm-south-sudan-flow-monitoring-apr20.xlsx")
+may20 <- read_xlsx("dtm-south-sudan-flow-monitoring-may20.xlsx")
+jun20 <- read_xlsx("dtm-south-sudan-flow-monitoring-jun20.xlsx")
+jul20 <- read_xlsx("dtm-south-sudan-flow-monitoring-jul20.xlsx")
+sep20 <- read_xlsx("dtm-south-sudan-flow-monitoring-sep20.xlsx")
+oct20 <- read_xlsx("dtm-south-sudan-flow-monitoring-oct20.xlsx")
+nov20 <- read_xlsx("dtm-south-sudan-flow-monitoring-nov20.xlsx")
+dec20 <- read_xlsx("dtm-south-sudan-flow-monitoring-dec20.xlsx")
+jan21 <- read_xlsx("dtm-south-sudan-flow-monitoring-jan21.xlsx")
+```
+
+Deleting the first row
+```{r}
+jan20 <- jan20[-1,]
+feb20 <- feb20[-1,]
+mar20 <- mar20[-1,]
+apr20 <- apr20[-1,]
+may20 <- may20[-1,]
+jun20 <- jun20[-1,]
+jul20 <- jul20[-1,]
+sep20 <- sep20[-1,]
+oct20 <- oct20[-1,]
+nov20 <- nov20[-1,]
+dec20 <- dec20[-1,]
+jan21 <- jan21[-1,]
+```
+
+changing classes
+```{r}
+col_with_factors <- c(2,5:29,40:42)
+col_with_numeric <- c(1,3,4)
+col_with_integer <- c(30:39,43:46)
+for (i in col_with_factors) {
+  jan20[,i] <- as_factor(unlist(jan20[,i]))
+  feb20[,i] <- as_factor(unlist(feb20[,i]))
+  mar20[,i] <- as_factor(unlist(mar20[,i]))
+  apr20[,i] <- as_factor(unlist(apr20[,i]))
+  may20[,i] <- as_factor(unlist(may20[,i]))
+  jun20[,i] <- as_factor(unlist(jun20[,i]))
+  jul20[,i] <- as_factor(unlist(jul20[,i]))
+  sep20[,i] <- as_factor(unlist(sep20[,i]))
+  oct20[,i] <- as_factor(unlist(oct20[,i]))
+  nov20[,i] <- as_factor(unlist(nov20[,i]))
+  dec20[,i] <- as_factor(unlist(dec20[,i]))
+  jan21[,i] <- as_factor(unlist(jan21[,i]))
+}
+for (i in col_with_numeric) {
+  jan20[,i] <- as.numeric(unlist(jan20[,i]))
+  feb20[,i] <- as.numeric(unlist(feb20[,i]))
+  mar20[,i] <- as.numeric(unlist(mar20[,i]))
+  apr20[,i] <- as.numeric(unlist(apr20[,i]))
+  may20[,i] <- as.numeric(unlist(may20[,i]))
+  jun20[,i] <- as.numeric(unlist(jun20[,i]))
+  jul20[,i] <- as.numeric(unlist(jul20[,i]))
+  sep20[,i] <- as.numeric(unlist(sep20[,i]))
+  oct20[,i] <- as.numeric(unlist(oct20[,i]))
+  nov20[,i] <- as.numeric(unlist(nov20[,i]))
+  dec20[,i] <- as.numeric(unlist(dec20[,i]))
+  jan21[,i] <- as.numeric(unlist(jan21[,i]))
+}
+for (i in col_with_integer) {
+  jan20[,i] <- as.integer(unlist(jan20[,i]))
+  feb20[,i] <- as.integer(unlist(feb20[,i]))
+  mar20[,i] <- as.integer(unlist(mar20[,i]))
+  apr20[,i] <- as.integer(unlist(apr20[,i]))
+  may20[,i] <- as.integer(unlist(may20[,i]))
+  jun20[,i] <- as.integer(unlist(jun20[,i]))
+  jul20[,i] <- as.integer(unlist(jul20[,i]))
+  sep20[,i] <- as.integer(unlist(sep20[,i]))
+  oct20[,i] <- as.integer(unlist(oct20[,i]))
+  nov20[,i] <- as.integer(unlist(nov20[,i]))
+  dec20[,i] <- as.integer(unlist(dec20[,i]))
+  jan21[,i] <- as.integer(unlist(jan21[,i]))
+}
+jan20$interview.month <- as.Date(jan20$interview.month) - 25569
+jan20$interview.month[c(11527,11526)] <- "2020-01-01"
+feb20$interview.month <- as.Date(feb20$interview.month) - 25569
+mar20$interview.month <- as.Date(mar20$interview.month) - 25569
+apr20$interview.month <- as.Date(apr20$interview.month) - 25569
+may20$interview.month <- as.Date(may20$interview.month) - 25569
+jun20$interview.month <- as.Date(jun20$interview.month) - 25569
+jul20$interview.month <- as.Date(jul20$interview.month) - 25569
+sep20$interview.month <- as.Date(sep20$interview.month) - 25569
+oct20$interview.month <- as.Date(oct20$interview.month) - 25569
+nov20$interview.month <- as.Date(nov20$interview.month) - 25569
+dec20$interview.month <- as.Date(dec20$interview.month) - 25569
+jan21$interview.month <- as.Date(jan21$interview.month) - 25569
+```
+
+combining all data
+```{r}
+dtm.alldata <- rbind(jan20,feb20,mar20,apr20,may20,jun20,jul20,sep20,oct20,nov20,dec20,jan21)
+dim(dtm.alldata)
+sum(dtm.alldata$total.ind, na.rm = TRUE)
+```
+
+Overview of our data. The dataset contains 1,723 surveys with a total of 16,446 individuals.
+```{r}
+#creating matrix with only forced migrants who are not coming from a refugee camp
+forced.migrants <- dtm.alldata %>% 
+  filter(forced.displacement == "Yes") %>%
+  filter(dep.iscamp=="No") 
+#number of observations
+nrow(forced.migrants)
+#number of individuals
+sum(forced.migrants$total.ind)
+#summary of all reasons for travel/displacement
+reason_summary <- summary(dtm.alldata$reason)
+#summary of reasons for displaced refugees
+reason_summary_1 <- dtm.alldata %>%
+  filter(forced.displacement == "Yes") %>%
+  pull(reason) %>% summary()
+#summary of reasons for economic migrants
+reason_summary_2 <- dtm.alldata %>%
+  filter(reason == "Economic") %>%
+  pull(reason.subtype) %>% summary()
+#summary of departure countries
+dep_country_summary <- forced.migrants %>%
+  pull(dep.country) %>%
+  summary()
+```
+
+adding the geo-location to our dataset `dtm.alldata`.
+```{r, message=FALSE}
+setwd("~/OneDrive/Uni/SOAS University of London/Modules/year 3/Machine Learning/Project/Datasets")
+geodata_ss <- read_csv("southsudan_centroids_lonlat.csv")
+geodata_ss$ADM2_PCODE <- as.factor(geodata_ss$ADM2_PCODE)
+geodata_ss$lon <- as.numeric(geodata_ss$lon)
+geodata_ss$lat <- as.numeric(geodata_ss$lat)
+geodata_ss <- geodata_ss[,c(4,15,16)]
+geodata_s <- read_csv("sudan_centroids_lonlat.csv")
+geodata_s$lon <- as.numeric(geodata_s$lon)
+geodata_s$lat <- as.numeric(geodata_s$lat)
+geodata_s <- geodata_s[,c(5,20,21)]
+geodata <- rbind(geodata_s,geodata_ss)
+all_admin2 <- c(as.character(geodata_ss$ADM2_PCODE),geodata_s$ADM2_PCODE)
+```
+
+adding geodata to our dataset and exporting it
+```{r}
+dep.lon <- vector(length = nrow(dtm.alldata))
+dep.lat <- vector(length = nrow(dtm.alldata))
+for (i in 1:nrow(dtm.alldata)) {
+  row <- which(dtm.alldata$dep.adm2.pcode[i] == geodata_ss$ADM2_PCODE)
+  row <- as.integer(row)
+  dep.lon[i] <- as.numeric(geodata_ss[row,2])
+  dep.lat[i] <- as.numeric(geodata_ss[row,3])
+}
+dtm.alldata.geo <- cbind(dtm.alldata,dep.lon,dep.lat)
+forced.migrants.geo <- dtm.alldata.geo %>% 
+  filter(forced.displacement == "Yes") %>%
+  filter(dep.iscamp=="No") 
+#export
+#write.csv(dtm.alldata.geo,"all_travellers.csv")
+#write.csv(forced.migrants.geo,"forced_migrants.csv")
+```
+
+
+Distance between departure location and place of survey.
+```{r}
+distance_travelled <- vector(length = nrow(dtm.alldata.geo))
+for (i in 1:nrow(dtm.alldata.geo)) {
+  distance_travelled[i] <-
+    distm(c(dtm.alldata.geo$fmp.longitude[i],dtm.alldata.geo$fmp.latitude[i]),
+          c(dtm.alldata.geo$dep.lon[i],dtm.alldata.geo$dep.lat[i]), 
+          fun = distHaversine)
+}
+summary(distance_travelled)
+dtm.alldata.geo <- cbind(dtm.alldata.geo, distance_travelled)
+```
+The average person travelled 113 km.
+
+Mode of transports
+```{r}
+summary(dtm.alldata.geo$transport)
+```
+
+Unify `Three-wheel` and `Three Wheel`
+```{r}
+for (i in 1:nrow(dtm.alldata.geo)) {
+  if (is.na(dtm.alldata.geo$transport[i]) == TRUE) dtm.alldata.geo$transport[i] <- NA else
+    if (dtm.alldata.geo$transport[i] == "Three-wheel") dtm.alldata.geo$transport[i] <- "Three Wheel" 
+}
+```
+
+Estimating travelled distance with each mode of transport per day.
+```{r}
+basic_unit <- 1 # e.g., 1 could stand for 1 km
+air <- basic_unit * 300
+bus <- basic_unit * 50
+motorbike <- basic_unit * 50
+bike <- basic_unit * 20
+foot <- basic_unit * 5
+truck <- basic_unit * 50
+taxi.car <- basic_unit * 100
+boat <- basic_unit * 25
+animals <- basic_unit * 10
+three.wheel <- basic_unit * 20
+train <- basic_unit * 100
+transport.na <- basic_unit * 20
+```
+
+Plotting the travelled distance for all forced migrants.
+```{r}
+ggplot(dtm.alldata.geo, aes(x = transport, y = distance_travelled/1000)) +
+  geom_boxplot() +
+  ylab("Travelled distance in km") +
+  xlab("Mode of Transport")
+```
+Plotting travelled distance for all migrants who have fled from natural disasters, i.e., floods and droughts.
+```{r}
+dtm.alldata.geo %>% filter(reason == "Disaster Displacement") %>%
+  ggplot(aes(x = transport, y = distance_travelled/1000)) +
+    geom_boxplot() +
+    scale_y_continuous(trans = 'log2') +
+    ylab("Travelled distance in km") +
+    xlab("Mode of Transport") +
+    ggtitle("Distance travelled by migrants displaced due to floods and droughts")
+```
+
+Estimating the day of departure
+```{r}
+default.dep.date <- 15 #i.e., at the first day of the month during which the interview happened
+default.distance <- mean(dtm.alldata.geo$distance_travelled, na.rm=TRUE)
+dep.date <- rep(default.dep.date, nrow(dtm.alldata.geo))
+for (i in 1:nrow(dtm.alldata.geo)) {
+  if(is.na(dtm.alldata.geo$transport[i]) == TRUE) distance_per_day <- transport.na else {
+    if(dtm.alldata.geo$transport[i] == "Air") distance_per_day <- air
+    if(dtm.alldata.geo$transport[i] == "Bus") distance_per_day <- bus
+    if(dtm.alldata.geo$transport[i] == "Motorbike") distance_per_day <- motorbike
+    if(dtm.alldata.geo$transport[i] == "Bike") distance_per_day <- bike
+    if(dtm.alldata.geo$transport[i] == "Foot") distance_per_day <- foot
+    if(dtm.alldata.geo$transport[i] == "Truck") distance_per_day <- truck
+    if(dtm.alldata.geo$transport[i] == "Taxi Or Car") distance_per_day <- taxi.car
+    if(dtm.alldata.geo$transport[i] == "Boat") distance_per_day <- boat
+    if(dtm.alldata.geo$transport[i] == "Animals") distance_per_day <- animals
+    if(dtm.alldata.geo$transport[i] == "Three Wheel") distance_per_day <- three.wheel
+    if(dtm.alldata.geo$transport[i] == "J. Train") distance_per_day <- train
+  }
+  if(is.na(dtm.alldata.geo$distance_travelled[i]) == TRUE) {
+    dep.date[i] <- dtm.alldata.geo$interview.month[i] + 15 - 
+      (default.distance/1000) / distance_per_day }
+  else {
+    dep.date[i] <- dtm.alldata.geo$interview.month[i] + 15 - 
+      (dtm.alldata.geo$distance_travelled[i]/1000) / distance_per_day
+  }
+}
+dep.date <- as.Date(dep.date)
+```
+
+Preparing a column with the name of the starting month to store values in monthly bins.
+```{r}
+dep.month <- floor_date(dep.date, unit = "month")
+dtm.alldata.geo <- cbind(dtm.alldata.geo, dep.date, dep.month)
+```
+
+Filtering for only forced migration.
+```{r}
+forced.migrants.geo <- dtm.alldata.geo %>%
+  filter(forced.displacement == "Yes")
+```
+
+### Creating an aggregated matrix
+```{r}
+agg.fm.matrix <- matrix(ncol = ncol(forced.migrants.geo), nrow = length(all_admin2)*14)
+rownames(agg.fm.matrix) <- paste0(all_admin2[rep(c(1:length(all_admin2)), each = 14)]," ",
+                                  month.abb[c(12,1:12,1)]," ",
+                                  c(rep(19,1),rep(20,12),21))
+colnames(agg.fm.matrix) <- colnames(forced.migrants.geo)
+agg.fm.matrix <- data.frame(agg.fm.matrix)
+```
+
+Labelling observations:
+First row is Admin 2 code and second row is first day of month of departure.
+```{r}
+admin2codes <- all_admin2[rep(c(1:length(all_admin2)), each = 14)]
+month.dep <- seq(as.Date("2019-12-01"), length=14, by="1 month")
+agg.fm.matrix <- cbind(admin2codes, month.dep, agg.fm.matrix)
+agg.fm.matrix$admin2codes <- as.factor(agg.fm.matrix$admin2codes)
+```
+
+
+Aggregate the remaining values
+```{r, warning = FALSE}
+columns_to_take_most_frequent <- c(1,2,3,4,5,6,7,8,9,10,12,13,14,15,16,17,19,22,23,27,28,29,40:42,51)
+columns_to_take_percentage_of_factor_YES <- c(11,18,20,21,24,25,26)
+columns_to_take_sum <- c(30,31:39,43:46)
+columns_to_take_average <- c(49,50)
+for(i in 1:nrow(agg.fm.matrix)) {
+  pcode <- as.character(agg.fm.matrix[i,1])
+  month <- agg.fm.matrix[i,2]
+  subset <- forced.migrants.geo %>% 
+    filter(dep.adm2.pcode == pcode) %>%
+    filter(dep.month == month)
+  if(nrow(subset) != 0) {
+    for(j in columns_to_take_most_frequent) {
+      agg.fm.matrix[i,j+2] <- names(sort(table(subset[,j]), decreasing = TRUE)[1])
+    }
+    for(j in columns_to_take_percentage_of_factor_YES) {
+      agg.fm.matrix[i,j+2] <- mean(subset[,j] == "Yes")
+    }
+    for(j in columns_to_take_sum) {
+      agg.fm.matrix[i,j+2] <- sum(subset[,j])
+    }
+    for(j in columns_to_take_average) {
+      agg.fm.matrix[i,j+2] <- mean(subset[,j])
+    }
+    #if(i/30 == round(i/30)) print(i/nrow(agg.fm.matrix))
+  }
+}
+```
+
+Import weather data
+```{r, warning = FALSE}
+setwd("~/OneDrive/Uni/SOAS University of London/Modules/year 3/Machine Learning/Project/displacement_sudan")
+precipitation <- read.csv("precipitation_all.csv")
+temperature <- read.csv("temperature_all.csv")
+heat <- read.csv("heat_all.csv")
+windchill <- read.csv("windchill_all.csv")
+maxwind <- read.csv("maxwind_all.csv")
+meanwind <- read.csv("meanwind_all.csv")
+```
+
+Calculate weather variables
+```{r}
+rain.dep.month <- vector(length = nrow(agg.fm.matrix))
+rain.month.before <- vector(length = nrow(agg.fm.matrix))
+rain.two.months.before <- vector(length = nrow(agg.fm.matrix))
+for(i in 1:nrow(agg.fm.matrix)) {
+  pcode <- as.character(agg.fm.matrix[i,1])
+  pcode_col <- which(pcode == all_admin2) + 2
+  month <- agg.fm.matrix[i,2]
+  month_row <- which(month == seq(as.Date("2019-10-01"), 
+                                  as.Date("2021-01-31"),
+                                  1))
+  #rain in departure month
+  rain.dep.month[i] <- sum(precipitation[c(month_row:(month_row+29)), pcode_col])
+  rain.month.before[i] <- sum(precipitation[c((month_row-30):(month_row-1)), 
+                                                               pcode_col])
+  #rain two months before
+  if(month_row < 60) rain.two.months.before[i] <- NA
+  if(month_row > 59) rain.two.months.before[i] <- sum(precipitation[c((month_row-60):(month_row-31)), 
+                                                               pcode_col])
+}
+#rain sum two months
+rain.sum.2.months <- rain.dep.month + rain.month.before
+#rain sum three months
+rain.sum.3.months <- rain.dep.month + rain.month.before + rain.two.months.before
+#average temperature
+temp.dep.month <- vector(length = nrow(agg.fm.matrix))
+temp.month.before <- vector(length = nrow(agg.fm.matrix))
+temp.two.months.before <- vector(length = nrow(agg.fm.matrix))
+for(i in 1:nrow(agg.fm.matrix)) {
+  pcode <- as.character(agg.fm.matrix[i,1])
+  pcode_col <- which(pcode == all_admin2) + 2
+  month <- agg.fm.matrix[i,2]
+  month_row <- which(month == seq(as.Date("2019-10-01"), 
+                                  as.Date("2021-01-31"),
+                                  1))
+  temp.dep.month[i] <- mean(heat[c(month_row:(month_row+29)), pcode_col])
+  temp.month.before[i] <- mean(heat[c((month_row-30):(month_row-1)),
+                                   pcode_col])
+  #rain two months before
+  if(month_row < 60) temp.two.months.before[i] <- NA
+  if(month_row > 59) temp.two.months.before[i] <- mean(heat[c((month_row-60):(month_row-31)),
+                                                           pcode_col])
+}
+#temp sum two months
+temp.sum.2.months <- (temp.dep.month+temp.month.before)/2
+#temp sum three months
+temp.sum.3.months <- (temp.dep.month+temp.month.before+temp.two.months.before)/3
+```
+
+Adding weather variables to the dataset
+```{r}
+agg.fm.matrix <- cbind(agg.fm.matrix,
+                       rain.dep.month,rain.month.before,rain.two.months.before,
+                       rain.sum.2.months,rain.sum.3.months,
+                       temp.dep.month,temp.month.before,temp.two.months.before,
+                       temp.sum.2.months,temp.sum.3.months)
+#converting South Sudan data from inches to mm
+agg.fm.matrix <- agg.fm.matrix %>%
+  mutate(rain.dep.month = ifelse(substr(admin2codes,1,2) == "SS", 
+                                 rain.dep.month/0.03937007874, 
+                                 rain.dep.month)) %>%
+  mutate(rain.month.before = ifelse(substr(admin2codes,1,2) == "SS", 
+                                 rain.month.before/0.03937007874, 
+                                 rain.month.before)) %>%
+  mutate(rain.two.months.before = ifelse(substr(admin2codes,1,2) == "SS", 
+                                 rain.two.months.before/0.03937007874, 
+                                 rain.two.months.before)) %>%
+  mutate(rain.sum.2.months = ifelse(substr(admin2codes,1,2) == "SS", 
+                                 rain.sum.2.months/0.03937007874, 
+                                 rain.sum.2.months)) %>%
+  mutate(rain.sum.3.months =ifelse(substr(admin2codes,1,2) == "SS", 
+                                 rain.sum.3.months/0.03937007874, 
+                                 rain.sum.3.months)) 
+```
+
+Adding `total.ind = 0` if there is no recorded migration.
+```{r}
+for(i in 1:nrow(agg.fm.matrix)) {
+  if(is.na(agg.fm.matrix$total.ind[i]) == TRUE) agg.fm.matrix$total.ind[i] <- 0
+}
+```
+
+
+Adding the total population data
+```{r, warning = FALSE}
+setwd("~/OneDrive/Uni/SOAS University of London/Modules/year 3/Machine Learning/Project/Datasets")
+SSpop <- read_xlsx("20201102_2020_2021_south_sudan_cod-population_endorsed_v2.xlsx")
+SSpop[,4] <- as.factor(SSpop$admin2Pcod)
+SDpop <- read_xlsx("sudan_hno-2021-baseline-data.xlsx")[-1,]
+SDpop[,3] <- as.factor(SDpop$`LOCLITY PCODE`)
+SDpop <- SDpop[-73,]
+population2021 <- vector(length = nrow(agg.fm.matrix))
+for (i in 1:nrow(agg.fm.matrix)) {
+  if (sum(agg.fm.matrix$admin2codes[i] == SSpop$admin2Pcod) == 1) {
+    row <- which(agg.fm.matrix$admin2codes[i] == SSpop$admin2Pcod)
+    population2021[i] <- as.integer(SSpop[row,5])
+  }
+  if (sum(agg.fm.matrix$admin2codes[i] == SDpop$`LOCLITY PCODE`) == 1) {
+    row <- which(agg.fm.matrix$admin2codes[i] == SDpop$`LOCLITY PCODE`)
+    population2021[i] <- as.integer(SDpop[row,5])
+  }
+}
+agg.fm.matrix <- cbind(agg.fm.matrix, population2021)
+```
+
+Calculating the share of the population that fled.
+```{r}
+agg.fm.matrix <- agg.fm.matrix %>% mutate(mig.per.1000000 = total.ind/population2021*1000000)
+```
+
+
+Importing the historical temperature and precipitation data.
+```{r}
+setwd("~/OneDrive/Uni/SOAS University of London/Modules/year 3/Machine Learning/Project/displacement_sudan/Data/past_weather/TerraClimate_ppt_alltime.nc_ppt_SD")
+historical.precipitation.sd <- array(dim = c(189,16,11))
+for (i in 2009:2019) {
+  file_name <- paste0("TerraClimate_ppt_",i,".nc_ppt_SD.csv")
+  imported_data <- read.csv(file_name)
+  historical.precipitation.sd[,,i-2008]  <- as.matrix(imported_data)
+}
+historical.precipitation.ss <- array(dim = c(79,16,11))
+for (i in 2009:2019) {
+  file_name <- paste0("TerraClimate_ppt_",i,".nc_ppt_SSD.csv")
+  imported_data <- read.csv(file_name)
+  historical.precipitation.ss[,,i-2008]  <- as.matrix(imported_data)
+}
+setwd("~/OneDrive/Uni/SOAS University of London/Modules/year 3/Machine Learning/Project/displacement_sudan/Data/past_weather/Temperature")
+historical.temp.sd <- array(dim = c(189,16,7))
+years_available <- c(2011,2014:2019)
+j <- 0
+for (i in years_available) {
+  j <- j+1
+  file_name <- paste0("TerraClimate_tmax_",i,".nc_temp_SD.csv")
+  imported_data <- read.csv(file_name)
+  historical.temp.sd[,,j]  <- as.matrix(imported_data)
+}
+historical.temp.ss <- array(dim = c(79,16,7))
+j <- 0
+for (i in years_available) {
+  j <- j+1
+  file_name <- paste0("TerraClimate_tmax_",i,".nc_temp_SSD.csv")
+  imported_data <- read.csv(file_name)
+  historical.temp.ss[,,j]  <- as.matrix(imported_data)
+}
+```
+
+Taking mean from 2009 to 2019.
+```{r, warning = FALSE}
+mean.historical.precipitation <- matrix(nrow = 189+79, ncol = 15)
+mean.historical.precipitation[,1:3] <- rbind(historical.precipitation.sd[,1:3,1],
+                                             historical.precipitation.ss[,1:3,1])
+mean.historical.precipitation[,4:15] <- as.numeric(mean.historical.precipitation[,4:15])
+for (i in 4:15) {
+  for (j in 1:189) {
+    mean.historical.precipitation[j,i] <- mean(as.numeric(historical.precipitation.sd[j,i,]))
+  }
+  for (j in 190:268) {
+    mean.historical.precipitation[j,i] <- mean(as.numeric(historical.precipitation.ss[j-189,i,]))
+  }
+}
+#mean.historical.precipitation[,4:15] <- as.numeric(mean.historical.precipitation[,4:15])
+mean.historical.temp <- matrix(nrow = 189+79, ncol = 15)
+mean.historical.temp[,1:3] <- rbind(historical.temp.sd[,1:3,1],
+                                    historical.temp.ss[,1:3,1])
+for (i in 4:15) {
+  for (j in 1:189) {
+    mean.historical.temp[j,i] <- mean(as.numeric(historical.temp.sd[j,i,]))
+  }
+  for (j in 190:268) {
+    mean.historical.temp[j,i] <- mean(as.numeric(historical.temp.ss[j-189,i,]))
+  }
+}
+setwd("~/OneDrive/Uni/SOAS University of London/Modules/year 3/Machine Learning/Project/displacement_sudan/Data/admin_boundaries")
+size.ss <- read.csv("area_pcode_southsudan.csv")
+size.sd <- read.csv("area_pcode_sudan.csv")
+size <- rbind(size.sd, size.ss)
+mean.historical.precipitation <- cbind(mean.historical.precipitation, size[,4])
+mean.historical.precipitation <- data.frame(mean.historical.precipitation)
+names(mean.historical.precipitation) <- c("index", "pcode", "country", "jan", "feb",
+                                          "mar", "apr", "may", "jun", "jul", "aug",
+                                          "sep", "oct", "nov", "dec", "size")
+for (i in 4:16) mean.historical.precipitation[,i] <- as.numeric(mean.historical.precipitation[,i])
+mean.historical.precipitation <- mean.historical.precipitation %>%
+  mutate(jan = jan/size) %>%
+  mutate(feb = feb/size) %>%
+  mutate(mar = mar/size) %>%
+  mutate(apr = apr/size) %>%
+  mutate(may = may/size) %>%
+  mutate(jun = jun/size) %>%
+  mutate(jul = jul/size) %>%
+  mutate(aug = aug/size) %>%
+  mutate(sep = sep/size) %>%
+  mutate(oct = oct/size) %>%
+  mutate(nov = nov/size) %>%
+  mutate(dec = dec/size)
+mean(mean.historical.precipitation)
+```
+
+
+Calculating difference to 2020.
+```{r}
+rel.rain.dep.month <- vector(length = length(agg.fm.matrix))
+rel.rain.month.before <- vector(length = length(agg.fm.matrix))
+rel.rain.two.months.before <- vector(length = length(agg.fm.matrix))
+rel.rain.sum.2.months <- vector(length = length(agg.fm.matrix))
+rel.rain.sum.3.months <- vector(length = length(agg.fm.matrix))
+rel.temp.dep.month <- vector(length = length(agg.fm.matrix))
+rel.temp.month.before <- vector(length = length(agg.fm.matrix))
+rel.temp.two.months.before <- vector(length = length(agg.fm.matrix))
+rel.temp.sum.2.months <- vector(length = length(agg.fm.matrix))
+rel.temp.sum.3.months <- vector(length = length(agg.fm.matrix))
+for(i in 1:nrow(agg.fm.matrix)) {
+  pcode <- as.character(agg.fm.matrix[i,1])
+  pcode_row <- which(pcode == mean.historical.precipitation[,2])
+  month_col <- as.integer(substr(agg.fm.matrix[i,2],6,7)) + 3
+  
+  #precipitation
+  rel.rain.dep.month[i] <- agg.fm.matrix$rain.dep.month[i] -
+    as.numeric(mean.historical.precipitation[pcode_row,month_col])
+  month.before <- month_col - 1
+  if (month_col == 4) month.before <- 15
+  rel.rain.month.before[i] <- agg.fm.matrix$rain.month.before[i] -
+    as.numeric(mean.historical.precipitation[pcode_row,month.before])
+  month.2.before <- month_col - 2
+  if (month_col == 4) month.2.before <- 14
+  if (month_col == 5) month.2.before <- 15
+  rel.rain.two.months.before[i] <- agg.fm.matrix$rain.two.months.before[i] -
+    as.numeric(mean.historical.precipitation[pcode_row,month.2.before])
+  rel.rain.sum.2.months[i] <- rel.rain.month.before[i] + rel.rain.two.months.before[i]
+  rel.rain.sum.3.months[i] <- rel.rain.sum.2.months[i] + rel.rain.two.months.before[i]
+  
+  #temperature
+  rel.temp.dep.month[i] <- agg.fm.matrix$temp.dep.month[i] -
+    as.numeric(mean.historical.temp[pcode_row,month_col])
+  month.before <- month_col - 1
+  if (month_col == 4) month.before <- 15
+  rel.temp.month.before[i] <- agg.fm.matrix$temp.month.before[i] -
+    as.numeric(mean.historical.temp[pcode_row,month.before])
+  month.2.before <- month_col - 2
+  if (month_col == 4) month.2.before <- 14
+  if (month_col == 5) month.2.before <- 15
+  rel.temp.two.months.before[i] <- agg.fm.matrix$temp.two.months.before[i] -
+    as.numeric(mean.historical.temp[pcode_row,month.2.before])
+  rel.temp.sum.2.months[i] <- (rel.temp.month.before[i] + rel.temp.dep.month[i])/2
+  rel.temp.sum.3.months[i] <- (rel.temp.month.before[i] + rel.temp.dep.month[i] +
+                                 rel.temp.two.months.before[i])/3
+}
+```
+
+Addint historical weather comparison to the main dataset.
+```{r}
+agg.fm.matrix <- cbind(agg.fm.matrix, rel.rain.dep.month, rel.rain.month.before,
+                       rel.rain.two.months.before, rel.rain.sum.2.months, rel.rain.sum.3.months,
+                       rel.temp.dep.month, rel.temp.month.before, rel.temp.two.months.before,
+                       rel.temp.sum.2.months, rel.temp.sum.3.months)
+```
+
+Exporting the aggregated table
+```{r}
+#write.csv(agg.fm.matrix,"monthly_data_3.csv")
+#agg.fm.matrix <- read.csv("monthly_data_4.csv")
+```
+
+Adding conflict deaths
+```{r}
+conflict_deaths_data <- read.csv("monthly_data_deaths.csv")
+conflict_deaths <- vector(length = nrow(agg.fm.matrix))
+for(i in 1:nrow(agg.fm.matrix)) {
+  pcode <- as.character(agg.fm.matrix[i,2])
+  pcode_row <- which(pcode == conflict_deaths_data[,2])
+  pcode_row <- pcode_row[1]
+  if (is.na(pcode_row) == TRUE) conflict_deaths[i] <- 0 else
+    if (is.na(conflict_deaths_data[pcode_row,67]) == TRUE) {
+      if (is.na(conflict_deaths_data[pcode_row,68]) ==TRUE) conflict_deaths[i] <- 0 else
+        conflict_deaths[i] <- conflict_deaths_data[pcode_row,68]
+    } else
+      conflict_deaths[i] <- conflict_deaths_data[pcode_row,67]
+}
+agg.fm.matrix <- cbind(agg.fm.matrix, conflict_deaths)
+#write.csv(agg.fm.matrix,"monthly_data_4.csv")
+```
+
+

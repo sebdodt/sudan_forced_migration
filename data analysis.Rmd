@@ -1,0 +1,241 @@
+---
+title: "Data Analysis"
+author: '659605'
+date: "10/04/2021"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(tidymodels)
+library(gam)
+library(akima)
+```
+
+## R Markdown
+
+```{r}
+setwd("~/OneDrive/Uni/SOAS University of London/Modules/year 3/Machine Learning/Project/displacement_sudan/Code")
+dataset <- read.csv("monthly_data_4.csv")
+```
+Selecting variables
+```{r}
+relevant_data <- dataset %>%
+  select(mig.per.1000000, rain.dep.month, rain.month.before, rain.two.months.before,
+         rain.sum.2.months, rain.sum.3.months, 
+         temp.dep.month, temp.month.before, temp.two.months.before, 
+         temp.sum.2.months, temp.sum.3.months,
+         rel.rain.dep.month, rel.rain.month.before, rel.rain.two.months.before,
+         rel.rain.sum.2.months, rel.rain.sum.3.months,
+         rel.temp.dep.month, rel.temp.month.before, rel.temp.two.months.before,
+         rel.temp.sum.2.months, rel.temp.sum.3.months, conflict_deaths,
+         reason, dep.country)
+```
+
+
+dealing with missing values
+```{r}
+for (i in 1:nrow(relevant_data)) {
+  if (is.na(relevant_data$mig.per.1000000[i]) == TRUE) relevant_data$mig.per.1000000[i] <- 0
+}
+```
+
+
+Splitting data into training and testing data
+```{r}
+set.seed(1)
+splits <- initial_split(relevant_data) #, strata = mig.per.1000000)
+dataset_train <- training(splits)
+dataset_test <- testing(splits)
+```
+
+
+Baseline model to compare more sophisticated models against.
+```{r}
+lm_model <- lm(mig.per.1000000 ~. -reason -dep.country, dataset_train)
+tidy(lm_model)
+```
+Quadratic model 
+```{r}
+lm_model <- lm(mig.per.1000000 ~ (rel.rain.dep.month)^2 + temp.dep.month, dataset_train)
+tidy(lm_model)
+```
+
+Figure 2a
+```{r}
+graph_data <- dataset %>%
+  filter(admin2codes == "SS0303") %>%
+  filter(month.dep != "2021-01-01")%>%
+  data.frame() %>%
+  mutate(month.dep = as.Date(month.dep))
+
+p <- ggplot(graph_data, aes(x = month.dep)) +
+  scale_x_date(date_labels = "%b")
+p <- p + geom_bar(aes(y = rel.rain.dep.month, 
+                      colour = "precipitation"),
+                  stat = "identity",
+                  fill = "#56B4E9")
+p <- p + geom_line(aes(y = mig.per.1000000/7, 
+                       colour = "Migration")) +
+  geom_point(aes(y = mig.per.1000000/7, 
+                       colour = "Migration"))
+p <- p + scale_y_continuous(sec.axis = sec_axis(~.*7, name = "Migrants (per million)"))
+p <- p + scale_colour_manual(values = c("#D55E00", "#56B4E9"))
+p <- p + labs(y = "relative precipitation (in mm)",
+              x = "Month of displacement in 2020", 
+              colour = "Variables")
+
+p <- p + theme(legend.position = c(0.1, 0.87), 
+               legend.title = element_text(size = 8),
+               legend.text = element_text(size = 8))
+p <- p + theme(
+    axis.title.y = element_text(color = "#0072B2", size=13),
+    axis.title.y.right = element_text(color = "#D55E00", size=13)
+  )
+p <- p + ggtitle("Figure 2a: Precipitation compared to 10-year average \n and migration in Bor, South Sudan")
+p 
+```
+
+Figure 2b
+```{r}
+graph_data <- dataset %>%
+  filter(admin2codes == "SS0304") %>%
+  filter(month.dep != "2021-01-01") %>%
+  data.frame() %>%
+  mutate(month.dep = as.Date(month.dep))
+
+p <- ggplot(graph_data, aes(x = month.dep)) +
+  scale_x_date(date_labels = "%b")
+p <- p + geom_bar(aes(y = rel.rain.dep.month, 
+                      colour = "precipitation"),
+                  stat = "identity",
+                  fill = "#56B4E9")
+p <- p + geom_line(aes(y = mig.per.1000000, 
+                       colour = "Migration")) +
+  geom_point(aes(y = mig.per.1000000, 
+                       colour = "Migration"))
+p <- p + scale_y_continuous(sec.axis = sec_axis(~., name = "Migrants (per million)"))
+p <- p + scale_colour_manual(values = c("#D55E00", "#56B4E9"))
+p <- p + labs(y = "relative precipitation (in mm)",
+              x = "Month of displacement in 2020", 
+              colour = "Variables")
+
+p <- p + theme(legend.position = c(0.1, 0.15), 
+               legend.title = element_text(size = 8),
+               legend.text = element_text(size = 8))
+p <- p + theme(
+    axis.title.y = element_text(color = "#0072B2", size=13),
+    axis.title.y.right = element_text(color = "#D55E00", size=13)
+  )
+p <- p + ggtitle("Figure 2b: Precipitation compared to 10-year average \n and migration in Canal and Pigi, South Sudan")
+p 
+```
+
+
+Fitting a GAM
+```{r}
+restricted <- dataset_train %>%
+  filter(rel.rain.dep.month < 500) %>%
+  rename(precipitation_difference = rel.rain.dep.month) %>%
+  rename(temperature_difference = rel.temp.dep.month) %>%
+  mutate(conflict_deaths = conflict_deaths/12) 
+gam1 <- gam(mig.per.1000000 ~ s(precipitation_difference,3) + 
+             s(temperature_difference,8) +
+             s(conflict_deaths, 2), 
+           data = restricted)
+par(mfrow = c(1,3))
+gam.plots <- plot(gam1, se = TRUE, col = "blue", 
+     ylab = "Forced migration per 1 million")
+```
+Testing the performance of the GAM
+```{r}
+test.restricted <- dataset_test %>%
+  rename(precipitation_difference = rel.rain.dep.month) %>%
+  rename(temperature_difference = rel.temp.dep.month) %>%
+  mutate(conflict_deaths = conflict_deaths/12)
+gam.fit <- predict(gam1, newdata = test.restricted)
+rmse <- mean(sqrt((gam.fit-dataset_test$mig.per.1000000)^2))
+rmse
+```
+
+Checking GAM of absolute data (rather than relative) as above. It does not perform as well.
+```{r}
+restricted <- dataset_train %>%
+  filter(rel.rain.dep.month < 550) %>%
+  rename(precipitation = rain.dep.month) %>%
+  rename(average_temperature = temp.dep.month) %>%
+  mutate(conflict_deaths = conflict_deaths/12)
+gam2 <- gam(mig.per.1000000 ~ s(precipitation,3) + 
+             s(average_temperature,8) +
+             s(conflict_deaths, 2), 
+           data = restricted)
+par(mfrow = c(1,3))
+gam.plots <- plot(gam2, se = TRUE, col = "blue", 
+     ylab = "Forced migration per 1 million per month")
+```
+
+```{r}
+test.restricted <- dataset_test %>%
+  rename(precipitation = rain.dep.month) %>%
+  rename(average_temperature = temp.dep.month) %>%
+  mutate(conflict_deaths = conflict_deaths/12)
+gam.fit <- predict(gam2, newdata = test.restricted)
+rmse <- mean(sqrt((gam.fit-dataset_test$mig.per.1000000)^2))
+rmse
+```
+
+
+
+Fitting a GAM on the data from the month before the migration occured. This performs better.
+```{r}
+restricted <- dataset_train %>%
+  filter(rel.rain.dep.month < 550) %>%
+  rename(precipitation = rel.rain.month.before) %>%
+  rename(average_temperature = rel.temp.month.before) %>%
+  mutate(conflict_deaths = conflict_deaths/12)
+gam3 <- gam(mig.per.1000000 ~ s(precipitation,3) + 
+             s(average_temperature,8) +
+             s(conflict_deaths, 2), 
+           data = restricted)
+test.restricted <- dataset_test %>%
+  rename(precipitation = rel.rain.month.before) %>%
+  rename(average_temperature = rel.temp.month.before) %>%
+  mutate(conflict_deaths = conflict_deaths/12)
+gam.fit <- predict(gam3, newdata = test.restricted)
+rmse <- mean(sqrt((gam.fit-dataset_test$mig.per.1000000)^2))
+rmse
+```
+
+
+Every variable is significant
+```{r}
+tidy(gam1)
+```
+
+The GAM passes the test against a baseline model
+```{r}
+rmse_baseline <- mean(sqrt((mean(dataset_test$mig.per.1000000)-dataset_test$mig.per.1000000)^2))
+rmse_baseline
+```
+
+Figure 4
+```{r, warning = FALSE}
+setwd("~/OneDrive/Uni/SOAS University of London/Modules/year 3/Environment and Climate Crisis/AS1")
+natural_disasters <- read.csv("number-of-natural-disaster-events.csv")
+natural_disasters %>% 
+  filter(Year > 1970) %>%
+  filter(Entity == "Drought" | Entity == "Flood") %>%
+  ggplot(aes(x = Year, y = Number.of.reported.natural.disasters..reported.disasters.)) +
+  geom_line(aes(color = Entity)) +
+  scale_color_manual(values = c("#D55E00", "#56B4E9")) + 
+  ggtitle("Figure 4: Number of droughts and floods worldwide") +
+  ylab("recorded cases") +
+  xlab("Year")
+```
+
+
+

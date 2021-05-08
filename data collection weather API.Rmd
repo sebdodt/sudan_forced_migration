@@ -1,0 +1,167 @@
+---
+title: "Weather API pull requests"
+author: "Sebastian Dodt"
+date: "19/03/2021"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## API precipitation download
+
+```{r, message=FALSE}
+require(jsonlite)
+require(dplyr)
+require(tidyr)
+library(zoo)
+library(ggplot2)
+library(readr)
+```
+
+
+### Pulling historical weather data from the OpenWeather API
+
+I registered 26 email addresses with the Weather data provider.
+```{r}
+APIs <- c(rep("ab4267cc8a0441f28b3203229211903",10), "e77f0b2e89764789844221309211903",
+          "6be53899edcb4093a97202124212603", "186a9a0985bc4998a08200749212603", 
+          "81e1f1325cbf4463863201019212603", "afdd19d5752f44aa9d4200728212603",
+          "51f476ad99e041e0b9a201710212603", "f330eddb08a743a1afa201014212603",
+          "0b5116dce7b34ac4923202542212603", "b277e3557ed54b4b982201702212603",
+          "e635f71fb57c4560a88201957212603", "26140a2010984694be7202857212603",
+          "6e4db4b0b7fb481dbf5202059212603", "e1d05549506f4a5d948202946212603",
+          "9cd62d7b89c54883bcd202206212603", "003b4ccb714f48b2809203029212603",
+          "d070519d4ab648f8824213054212603", "5e5beb0f7bce4b99bb8213029212603",
+          "69ef44d1abcb49d7b9f213121212603", "31de8235592d4bc789f213113212603",
+          "b1f32d39949045efaa3213047212603", "5f88e4c90dd14724b62213038212603",
+          "ec14565c48364240be9213042212603", "5084b09f1c084b5993e213306212603",
+          "a25d32d89f584a98a66213332212603", "c9afac8d57384bc49e6233402212603")
+```
+
+
+Functions to pull precipitation and temperature for a certain day at a certain place defined by longitude and latitude.
+```{r}
+precip_and_temp <- function(lon, lat, day, API) {
+  options(warn=-1)
+  url <- paste0("http://api.worldweatheronline.com/premium/v1/past-weather.ashx?key=",
+                API,
+                "&q=",
+                lon,",",
+                lat,
+                "&format=json&date=",
+                day,
+                "&includelocation=yes&tp=1") # this is the API url
+  response <- fromJSON(url)
+  response <- data.frame(response)
+  response <- unnest(response)
+  max.temperature <- max(as.numeric(response$tempC)) 
+  precipitation.daily <- sum(as.numeric(response$precipMM)) 
+  heat.index <- max(as.numeric(response$HeatIndexC)) 
+  max.feels.like <- max(as.numeric(response$WindChillC)) 
+  max.wind <- max(as.numeric(response$WindGustKmph)) 
+  mean.wind <- mean(as.numeric(response$WindGustKmph)) 
+  output <- c(precipitation.daily, max.temperature, heat.index, max.feels.like, max.wind, mean.wind)
+  output
+}
+```
+
+
+Loading location data
+```{r, warning = FALSE}
+setwd("~/OneDrive/Uni/SOAS University of London/Modules/year 3/Machine Learning/Project/Datasets")
+geodata_ss <- read_csv("southsudan_centroids_lonlat.csv")
+geodata_ss$ADM2_PCODE <- as.factor(geodata_ss$ADM2_PCODE)
+geodata_ss$lon <- as.numeric(geodata_ss$lon)
+geodata_ss$lat <- as.numeric(geodata_ss$lat)
+geodata_ss <- geodata_ss[,c(4,15,16)]
+geodata_s <- read_csv("sudan_centroids_lonlat.csv")
+geodata_s$lon <- as.numeric(geodata_s$lon)
+geodata_s$lat <- as.numeric(geodata_s$lat)
+geodata_s <- geodata_s[,c(5,20,21)]
+geodata <- rbind(geodata_s,geodata_ss)
+all_admin2 <- c(as.character(geodata_ss$ADM2_PCODE),geodata_s$ADM2_PCODE)
+```
+
+
+
+Preparing vectors to store downloaded results. 
+```{r}
+bulk.adm2 <- all_admin2
+precipitation.matrix <- matrix(nrow = 489, ncol = length(bulk.adm2) + 1)
+max.temp.matrix <- matrix(nrow = 489, ncol = length(bulk.adm2) + 1)
+heat.index.matrix <- matrix(nrow = 489, ncol = length(bulk.adm2) + 1)
+max.windchill.matrix <- matrix(nrow = 489, ncol = length(bulk.adm2) + 1)
+max.wind.matrix <- matrix(nrow = 489, ncol = length(bulk.adm2) + 1)
+mean.wind.matrix <- matrix(nrow = 489, ncol = length(bulk.adm2) + 1)
+colnames(precipitation.matrix) <- c("Date",bulk.adm2)
+colnames(max.temp.matrix) <- c("Date",bulk.adm2)
+colnames(heat.index.matrix) <- c("Date",bulk.adm2)
+colnames(max.windchill.matrix) <- c("Date",bulk.adm2)
+colnames(max.wind.matrix) <- c("Date",bulk.adm2)
+colnames(mean.wind.matrix) <- c("Date",bulk.adm2)
+```
+
+Pulling data from API server for the period Oct 2019 until Jan 2021 for all 268 regions in Sudan and South Sudan.
+```{r, warning = FALSE}
+k <- 0
+for (i in 1:2) { #instead of 2, one has to put 'length(bulk.adm2)'. 
+  #However, this takes about a week to run all the way through.
+  admin2 <- bulk.adm2[i] 
+  row <- which(admin2 == geodata_ss$ADM2_PCODE)
+  row <- as.integer(row)
+  longitude <- as.numeric(geodata_ss[row,2])
+  latitude <- as.numeric(geodata_ss[row,3])
+  for (j in 1:nrow(precipitation.matrix)) {
+    k <- k + 1
+    if(k == length(APIs) + 1) k <- 1
+    API_to_use <- APIs[k]
+    date <- as.Date("2019-10-01") + j - 1
+    precipitation.matrix[j,1] <- date
+    max.temp.matrix[j,1] <- date
+    heat.index.matrix[j,1] <- date
+    max.windchill.matrix[j,1] <- date
+    max.wind.matrix[j,1] <- date
+    mean.wind.matrix[j,1] <- date
+    output <- precip_and_temp(longitude, latitude, date, API_to_use)
+    precipitation.matrix[j,i+1] <- output[1]
+    max.temp.matrix[j,i+1] <- output[2]
+    heat.index.matrix[j,i+1] <- output[3]
+    max.windchill.matrix[j,i+1] <- output[4]
+    max.wind.matrix[j,i+1] <- output[5]
+    mean.wind.matrix[j,i+1] <- output[6]
+  }
+  print(i/length(bulk.adm2) * 100)
+}
+```
+
+
+Changing first column to date class
+```{r}
+precipitation.matrix <- data.frame(precipitation.matrix)
+precipitation.matrix[,1] <- as.Date.numeric(precipitation.matrix[,1])
+max.temp.matrix <- data.frame(max.temp.matrix)
+max.temp.matrix[,1] <- as.Date.numeric(max.temp.matrix[,1])
+heat.index.matrix <- data.frame(heat.index.matrix)
+heat.index.matrix[,1] <- as.Date.numeric(heat.index.matrix[,1])
+max.windchill.matrix <- data.frame(max.windchill.matrix)
+max.windchill.matrix[,1] <- as.Date.numeric(max.windchill.matrix[,1])
+max.wind.matrix <- data.frame(max.wind.matrix)
+max.wind.matrix[,1] <- as.Date.numeric(max.wind.matrix[,1])
+mean.wind.matrix <- data.frame(mean.wind.matrix)
+mean.wind.matrix[,1] <- as.Date.numeric(mean.wind.matrix[,1])
+```
+
+Export weather data
+```{r}
+write.csv(precipitation.matrix,"precipitation_knit.csv")
+write.csv(max.temp.matrix,"temperature_knit.csv")
+write.csv(heat.index.matrix,"heat_knit.csv")
+write.csv(max.windchill.matrix,"windchill_knit.csv")
+write.csv(max.wind.matrix,"maxwind_knit.csv")
+write.csv(mean.wind.matrix,"meanwind_knit.csv")
+#precipitation.matrix <- read.csv("precipitation.csv")
+```
